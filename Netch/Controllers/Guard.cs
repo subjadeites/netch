@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Text;
-using Microsoft.VisualStudio.Threading;
 using Netch.Enums;
 using Netch.Models;
 using Netch.Utils;
@@ -134,8 +133,22 @@ public abstract class Guard
         {
             if (Instance is { HasExited: false })
             {
-                Instance.Kill();
-                await Instance.WaitForExitAsync();
+                try
+                {
+                    // Kill the whole process tree to ensure child processes exit
+                    Instance.Kill(true);
+                }
+                catch (Exception e)
+                {
+                    Log.Warning(e, "Kill {Name} failed", Instance.ProcessName);
+                }
+
+                var wait = NativeMethods.WaitForSingleObject(Instance.Handle, 5000);
+                if (wait == NativeMethods.WAIT_TIMEOUT)
+                {
+                    Log.Warning("{Name} did not exit in time, terminating via Win32 API", Instance.ProcessName);
+                    NativeMethods.TerminateProcess(Instance.Handle, 1);
+                }
             }
         }
         catch (Exception e)
