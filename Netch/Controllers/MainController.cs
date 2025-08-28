@@ -1,4 +1,6 @@
+using System;
 using System.Diagnostics;
+using System.Linq;
 using Microsoft.VisualStudio.Threading;
 using Netch.Interfaces;
 using Netch.Models;
@@ -112,15 +114,27 @@ public static class MainController
         Log.Information("Stop Main Controller");
         StatusPortInfoText.Reset();
 
-        var tasks = new[]
+        var tasks = new List<(Task task, string name)>();
+
+        if (ServerController != null)
         {
-            ServerController?.StopAsync() ?? Task.CompletedTask,
-            ModeController?.StopAsync() ?? Task.CompletedTask
-        };
+            Log.Information("Stopping {Controller}", ServerController.Name);
+            var t = ServerController.StopAsync();
+            t.ContinueWith(_ => { Log.Information("Stopped {Controller}", ServerController.Name); });
+            tasks.Add((t, ServerController.Name));
+        }
+
+        if (ModeController != null)
+        {
+            Log.Information("Stopping {Controller}", ModeController.Name);
+            var t = ModeController.StopAsync();
+            t.ContinueWith(_ => { Log.Information("Stopped {Controller}", ModeController.Name); });
+            tasks.Add((t, ModeController.Name));
+        }
 
         try
         {
-            await Task.WhenAll(tasks);
+            await WhenAllWithTimeoutAsync(tasks, TimeSpan.FromSeconds(5));
         }
         catch (Exception e)
         {
@@ -129,6 +143,19 @@ public static class MainController
 
         ServerController = null;
         ModeController = null;
+    }
+
+    private static async Task WhenAllWithTimeoutAsync(IEnumerable<(Task task, string name)> tasks, TimeSpan timeout)
+    {
+        var taskList = tasks.ToList();
+        var allTask = Task.WhenAll(taskList.Select(t => t.task));
+        while (await Task.WhenAny(allTask, Task.Delay(timeout)) != allTask)
+        {
+            foreach (var t in taskList.Where(t => !t.task.IsCompleted))
+                Log.Warning("Stopping {Name} has taken more than {Seconds}s", t.name, timeout.TotalSeconds);
+        }
+
+        await allTask;
     }
 
     public static void PortCheck(ushort port, string portName, PortType portType = PortType.Both)
