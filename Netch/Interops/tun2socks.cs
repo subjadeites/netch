@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -49,7 +50,17 @@ namespace Netch.Interops
 
         public static async Task<bool> FreeAsync()
         {
-            return await Task.Run(tun_free).ConfigureAwait(false);
+            try
+            {
+                return await Task.Run(tun_free)
+                    .WaitAsync(TimeSpan.FromSeconds(5))
+                    .ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                Log.Warning("[tun2socks] free timed out");
+                return false;
+            }
         }
 
         private const string tun2socks_bin = "tun2socks.bin";
