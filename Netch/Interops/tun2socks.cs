@@ -73,7 +73,6 @@ namespace Netch.Interops
                 Log.Warning("[tun2socks] free timed out");
                 return false;
             }
-
             return await tcs.Task.ConfigureAwait(false);
         }
 
