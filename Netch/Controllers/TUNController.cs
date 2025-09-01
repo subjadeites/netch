@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using Netch.Interfaces;
@@ -119,14 +120,17 @@ namespace Netch.Controllers
 
         public async Task StopAsync()
         {
-            var tasks = new[]
-            {
-                FreeAsync(),
-                Task.Run(ClearRouteTable),
-                _aioDnsController.StopAsync()
-            };
+            await WaitOrTimeoutAsync(FreeAsync(), nameof(FreeAsync));
+            await WaitOrTimeoutAsync(Task.Run(ClearRouteTable), nameof(ClearRouteTable));
+            await WaitOrTimeoutAsync(_aioDnsController.StopAsync(), "AioDnsController.StopAsync");
+        }
 
-            await Task.WhenAll(tasks);
+        private static async Task WaitOrTimeoutAsync(Task task, string name)
+        {
+            if (await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5))) != task)
+                Log.Warning("{Step} timed out", name);
+            else
+                await task;
         }
 
         private void CheckDriver()
