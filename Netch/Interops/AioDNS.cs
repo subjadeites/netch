@@ -18,9 +18,33 @@ public static class AioDNS
         return Task.Run(Init);
     }
 
-    public static Task FreeAsync()
+    public static async Task FreeAsync()
     {
-        return Task.Run(Free);
+        var tcs = new TaskCompletionSource<bool>();
+        new Thread(() =>
+        {
+            try
+            {
+                Free();
+                tcs.TrySetResult(true);
+            }
+            catch (Exception e)
+            {
+                tcs.TrySetException(e);
+            }
+        })
+        {
+            IsBackground = true
+        }.Start();
+
+        var completed = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
+        if (completed != tcs.Task)
+        {
+            Log.Warning("[aiodns] free timed out");
+            return;
+        }
+
+        await tcs.Task.ConfigureAwait(false);
     }
 
     [DllImport(aiodns_bin, CallingConvention = CallingConvention.Cdecl)]
