@@ -1,6 +1,6 @@
 Set-Location (Split-Path $MyInvocation.MyCommand.Path -Parent)
 
-git clone https://github.com/SagerNet/v2ray-core.git -b 'v5.0.16' src
+git clone https://github.com/SagerNet/v2ray-core.git -b 'v5.0.3' src
 if ( -Not $? ) {
     exit $lastExitCode
 }
@@ -24,6 +24,8 @@ $Env:GOROOT_FINAL='/usr'
 $Env:GOOS='windows'
 $Env:GOARCH='amd64'
 go mod download
-go mod tidy
+go get github.com/Dreamacro/clash/transport/simple-obfs@v1.8.0
+go get github.com/Dreamacro/clash/transport/ssr/obfs@v1.8.0
+go get github.com/Dreamacro/clash/transport/ssr/protocol@v1.8.0
 go build -a -trimpath -asmflags '-s -w' -ldflags '-s -w -buildid=' -o '..\..\release\v2ray-sn.exe' '.\main'
 exit $lastExitCode
