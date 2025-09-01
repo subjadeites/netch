@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
 
@@ -50,17 +51,29 @@ namespace Netch.Interops
 
         public static async Task<bool> FreeAsync()
         {
-            try
+            var tcs = new TaskCompletionSource<bool>();
+            new Thread(() =>
             {
-                return await Task.Run(tun_free)
-                    .WaitAsync(TimeSpan.FromSeconds(5))
-                    .ConfigureAwait(false);
-            }
-            catch (TimeoutException)
+                try
+                {
+                    tcs.TrySetResult(tun_free());
+                }
+                catch (Exception e)
+                {
+                    tcs.TrySetException(e);
+                }
+            })
+            {
+                IsBackground = true
+            }.Start();
+
+            var completed = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
+            if (completed != tcs.Task)
             {
                 Log.Warning("[tun2socks] free timed out");
                 return false;
             }
+            return await tcs.Task.ConfigureAwait(false);
         }
 
         private const string tun2socks_bin = "tun2socks.bin";
