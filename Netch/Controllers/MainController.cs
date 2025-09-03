@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.Versioning;
 using Microsoft.VisualStudio.Threading;
 using Netch.Interfaces;
 using Netch.Models;
@@ -46,7 +47,10 @@ public static class MainController
             ModeController = ModeService.GetModeControllerByType(mode.Type, out var modePort, out var portName);
 
             if (modePort != null)
-                TryReleaseTcpPort((ushort)modePort, portName);
+            {
+                if (OperatingSystem.IsWindowsVersionAtLeast(8, 1))
+                    TryReleaseTcpPort((ushort)modePort, portName);
+            }
 
             if (Server is Socks5Server socks5 && (!socks5.Auth() || ModeController.Features.HasFlag(ModeFeature.SupportSocks5Auth)))
             {
@@ -60,7 +64,8 @@ public static class MainController
                 ServerController = new V2rayController();
                 Global.MainForm.StatusText(i18N.TranslateFormat("Starting {0}", ServerController.Name));
 
-                TryReleaseTcpPort(ServerController.Socks5LocalPort(), "Socks5");
+                if (OperatingSystem.IsWindowsVersionAtLeast(8, 1))
+                    TryReleaseTcpPort(ServerController.Socks5LocalPort(), "Socks5");
                 Socks5Server = await ServerController.StartAsync(server);
 
                 StatusPortInfoText.Socks5Port = Socks5Server.Port;
@@ -147,6 +152,7 @@ public static class MainController
         }
     }
 
+    [SupportedOSPlatform("windows8.1")]
     public static void TryReleaseTcpPort(ushort port, string portName)
     {
         foreach (var p in PortHelper.GetProcessByUsedTcpPort(port))
