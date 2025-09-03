@@ -24,6 +24,7 @@ $Env:GOROOT_FINAL='/usr'
 $Env:GOOS='windows'
 $Env:GOARCH='amd64'
 go mod download
+
 go get github.com/lucas-clemente/quic-go@v0.25.0
 go get github.com/Dreamacro/clash/transport/simple-obfs@v1.8.0
 go get github.com/Dreamacro/clash/transport/ssr/obfs@v1.8.0
