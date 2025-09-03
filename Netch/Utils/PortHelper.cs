@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using Windows.Win32;
 using Windows.Win32.NetworkManagement.IpHelper;
 using Netch.Models;
@@ -28,6 +29,7 @@ public static class PortHelper
         }
     }
 
+    [SupportedOSPlatform("windows8.1")]
     internal static IEnumerable<Process> GetProcessByUsedTcpPort(ushort port, AddressFamily inet = AddressFamily.InterNetwork)
     {
         if (port == 0)
