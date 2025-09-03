@@ -16,6 +16,9 @@ Remove-Item '.\common\buf\readv_reader.go'
 Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/SagerNet/v2ray-core/2711fd1/common/buf/io.go' -OutFile '.\common\buf\io.go'
 Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/SagerNet/v2ray-core/2711fd1/common/buf/readv_reader.go' -OutFile '.\common\buf\readv_reader.go'
 
+# Patch core for quic-go v0.31 API changes
+git apply '..\quic-conn.patch'
+
 $Env:CGO_ENABLED='0'
 $Env:GOROOT_FINAL='/usr'
 
