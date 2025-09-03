@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using Windows.Win32.Foundation;
 using Windows.Win32.Networking.WinSock;
 using Windows.Win32.NetworkManagement.IpHelper;
@@ -18,6 +19,7 @@ public static unsafe class RouteHelper
     [DllImport("RouteHelper.bin", CallingConvention = CallingConvention.Cdecl)]
     public static extern bool CreateUnicastIP(AddressFamily inet, string address, byte cidr, ulong index);
 
+    [SupportedOSPlatform("windows8.1")]
     public static bool CreateUnicastIPCS(AddressFamily inet, string address, byte cidr, ulong index)
     {
         MIB_UNICASTIPADDRESS_ROW addr;
