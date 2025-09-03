@@ -6,11 +6,9 @@ if ( -Not $? ) {
 }
 Set-Location src
 
-# Download SSR plugin
-Invoke-WebRequest -Uri 'https://gist.githubusercontent.com/H1JK/b3165a99b635dcc06101690e4c43b5fd/raw/691b471f3b395a949d03a3d064d93d319d4997b7/ssr.go' -OutFile '.\proxy\shadowsocks\plugin\self\ssr.go'
-
-# Download Simple-Obfs plugin
-Invoke-WebRequest -Uri 'https://gist.githubusercontent.com/H1JK/b3165a99b635dcc06101690e4c43b5fd/raw/691b471f3b395a949d03a3d064d93d319d4997b7/obfs.go' -OutFile '.\proxy\shadowsocks\plugin\self\obfs.go'
+# Add SSR and Simple-Obfs plugins
+Copy-Item '..\ssr.go' '.\proxy\shadowsocks\plugin\self\ssr.go'
+Copy-Item '..\obfs.go' '.\proxy\shadowsocks\plugin\self\obfs.go'
 
 # Enable ReadV (Use old ReadV code)
 Remove-Item '.\common\buf\io.go'
@@ -24,8 +22,10 @@ $Env:GOROOT_FINAL='/usr'
 $Env:GOOS='windows'
 $Env:GOARCH='amd64'
 go mod download
+go get github.com/lucas-clemente/quic-go@v0.31.0
 go get github.com/Dreamacro/clash/transport/simple-obfs@v1.8.0
 go get github.com/Dreamacro/clash/transport/ssr/obfs@v1.8.0
 go get github.com/Dreamacro/clash/transport/ssr/protocol@v1.8.0
+go mod tidy
 go build -a -trimpath -asmflags '-s -w' -ldflags '-s -w -buildid=' -o '..\..\release\v2ray-sn.exe' '.\main'
 exit $lastExitCode
