@@ -119,9 +119,11 @@ namespace Netch.Controllers
 
         public async Task StopAsync()
         {
+            if (!await FreeAsync().ConfigureAwait(false))
+                throw new MessageException("tun2socks free failed.");
+
             var tasks = new[]
             {
-                FreeAsync(),
                 Task.Run(ClearRouteTable),
                 _aioDnsController.StopAsync()
             };
