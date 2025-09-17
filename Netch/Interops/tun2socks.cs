@@ -49,31 +49,9 @@ namespace Netch.Interops
             return tun_init();
         }
 
-        public static async Task<bool> FreeAsync()
+        public static Task<bool> FreeAsync(CancellationToken cancellationToken = default)
         {
-            var tcs = new TaskCompletionSource<bool>();
-            new Thread(() =>
-            {
-                try
-                {
-                    tcs.TrySetResult(tun_free());
-                }
-                catch (Exception e)
-                {
-                    tcs.TrySetException(e);
-                }
-            })
-            {
-                IsBackground = true
-            }.Start();
-
-            var completed = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
-            if (completed != tcs.Task)
-            {
-                Log.Warning("[tun2socks] free timed out");
-                return false;
-            }
-            return await tcs.Task.ConfigureAwait(false);
+            return Task.Run(() => tun_free(), cancellationToken);
         }
 
         private const string tun2socks_bin = "tun2socks.bin";
