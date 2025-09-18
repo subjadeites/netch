@@ -51,7 +51,33 @@ namespace Netch.Interops
 
         public static Task<bool> FreeAsync(CancellationToken cancellationToken = default)
         {
-            return Task.Run(() => tun_free(), cancellationToken);
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            var freeThread = new Thread(() =>
+            {
+                try
+                {
+                    tcs.TrySetResult(tun_free());
+                }
+                catch (Exception e)
+                {
+                    tcs.TrySetException(e);
+                }
+            })
+            {
+                IsBackground = true
+            };
+
+            freeThread.Start();
+
+            if (cancellationToken.CanBeCanceled)
+            {
+                var registration = cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
+                tcs.Task.ContinueWith(_ => registration.Dispose(), CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            }
+
+            return tcs.Task;
         }
 
         private const string tun2socks_bin = "tun2socks.bin";
