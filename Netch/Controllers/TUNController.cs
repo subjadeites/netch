@@ -119,14 +119,15 @@ namespace Netch.Controllers
 
         public async Task StopAsync()
         {
-            var tasks = new[]
-            {
-                FreeAsync(),
+            var freeTask = FreeAsync();
+            var cleanupTask = Task.WhenAll(
                 Task.Run(ClearRouteTable),
-                _aioDnsController.StopAsync()
-            };
+                _aioDnsController.StopAsync());
 
-            await Task.WhenAll(tasks);
+            if (!await freeTask.ConfigureAwait(false))
+                throw new MessageException("tun2socks free failed.");
+
+            await cleanupTask.ConfigureAwait(false);
         }
 
         private void CheckDriver()
