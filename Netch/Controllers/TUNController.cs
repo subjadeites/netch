@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using Serilog;
 using Netch.Interfaces;
 using Netch.Interops;
 using Netch.Models;
@@ -119,12 +120,54 @@ namespace Netch.Controllers
 
         public async Task StopAsync()
         {
-            if (!await FreeAsync().ConfigureAwait(false))
-                throw new MessageException("tun2socks free failed.");
+            var freeTask = FreeAsync();
+            var forcedInterfaceDown = false;
+
+            try
+            {
+                if (!await WaitForCompletionAsync(freeTask, TimeSpan.FromSeconds(5)).ConfigureAwait(false))
+                {
+                    if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 26100) && _tun.InterfaceIndex > 0)
+                    {
+                        forcedInterfaceDown = NetworkInterfaceUtils.TrySetInterfaceAdminStatus(_tun.InterfaceIndex, false,
+                            TimeSpan.FromSeconds(3));
+
+                        if (!await WaitForCompletionAsync(freeTask, TimeSpan.FromSeconds(5)).ConfigureAwait(false))
+                            throw new MessageException("tun2socks free timed out.");
+                    }
+                    else
+                    {
+                        throw new MessageException("tun2socks free timed out.");
+                    }
+                }
+
+                if (!await freeTask.ConfigureAwait(false))
+                    throw new MessageException("tun2socks free failed.");
+            }
+            finally
+            {
+                if (forcedInterfaceDown)
+                {
+                    try
+                    {
+                        NetworkInterfaceUtils.TrySetInterfaceAdminStatus(_tun.InterfaceIndex, true, TimeSpan.FromSeconds(5));
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Warning(e, "Failed to restore TUN interface after forced shutdown");
+                    }
+                }
+            }
 
             await Task.WhenAll(
                 Task.Run(ClearRouteTable),
                 _aioDnsController.StopAsync()).ConfigureAwait(false);
+        }
+
+        private static async Task<bool> WaitForCompletionAsync(Task task, TimeSpan timeout)
+        {
+            var completed = await Task.WhenAny(task, Task.Delay(timeout)).ConfigureAwait(false);
+            return completed == task;
         }
 
         private void CheckDriver()
