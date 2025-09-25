@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using System.Management;
 using System.Net;
@@ -55,15 +56,46 @@ public static class NetworkInterfaceUtils
     public static bool TrySetInterfaceAdminStatus(int interfaceIndex, bool enable, TimeSpan? waitTimeout = null,
         TimeSpan? commandTimeout = null)
     {
-        string? adapterName = NetworkInterface.GetAllNetworkInterfaces()
-            .FirstOrDefault(ni => ni.GetIndex() == interfaceIndex)?.Name;
+        return TrySetInterfaceAdminStatusCore(interfaceIndex, 0, enable, waitTimeout, commandTimeout);
+    }
+
+    public static bool TrySetInterfaceAdminStatus(int interfaceIndex, ulong interfaceLuid, bool enable,
+        TimeSpan? waitTimeout = null, TimeSpan? commandTimeout = null, string? interfaceAliasHint = null)
+    {
+        return TrySetInterfaceAdminStatusCore(interfaceIndex, interfaceLuid, enable, waitTimeout, commandTimeout,
+            interfaceAliasHint);
+    }
+
+    private static bool TrySetInterfaceAdminStatusCore(int interfaceIndex, ulong interfaceLuid, bool enable,
+        TimeSpan? waitTimeout, TimeSpan? commandTimeout, string? interfaceAliasHint = null)
+    {
+        string? adapterName = null;
+
+        if (interfaceIndex > 0)
+        {
+            adapterName = NetworkInterface.GetAllNetworkInterfaces()
+                .FirstOrDefault(ni => ni.GetIndex() == interfaceIndex)?.Name;
+        }
+
+        if (adapterName == null && !string.IsNullOrWhiteSpace(interfaceAliasHint))
+            adapterName = interfaceAliasHint;
+
+        if (adapterName == null && interfaceLuid != 0)
+            adapterName = TryGetInterfaceAlias(interfaceLuid);
 
         if (adapterName == null)
         {
-            Log.Warning("Interface {InterfaceIndex} not found while toggling admin state", interfaceIndex);
+            Log.Warning("Interface {InterfaceIndex} (LUID {InterfaceLuid}) not found while toggling admin state",
+                interfaceIndex, interfaceLuid);
             return false;
         }
 
+        return TrySetInterfaceAdminStatusByName(interfaceIndex, adapterName, enable, waitTimeout, commandTimeout);
+    }
+
+    private static bool TrySetInterfaceAdminStatusByName(int interfaceIndex, string adapterName, bool enable,
+        TimeSpan? waitTimeout, TimeSpan? commandTimeout)
+    {
         var arguments =
             $"interface set interface name=\"{adapterName}\" admin={(enable ? "ENABLED" : "DISABLED")}";
         var timeout = (int)(commandTimeout ?? TimeSpan.FromSeconds(5)).TotalMilliseconds;
@@ -129,6 +161,41 @@ public static class NetworkInterfaceUtils
         }
 
         return true;
+    }
+
+    public static string? TryGetInterfaceAlias(ulong interfaceLuid)
+    {
+        if (interfaceLuid == 0)
+            return null;
+
+        try
+        {
+            return GetInterfaceAliasFromLuid(interfaceLuid);
+        }
+        catch (Exception e)
+        {
+            Log.Debug(e, "Failed to resolve interface alias for LUID {InterfaceLuid}", interfaceLuid);
+            return null;
+        }
+    }
+
+    private static unsafe string? GetInterfaceAliasFromLuid(ulong interfaceLuid)
+    {
+        NET_LUID luid = default;
+        *(ulong*)&luid = interfaceLuid;
+
+        Span<char> aliasBuffer = stackalloc char[(int)PInvoke.IF_MAX_STRING_SIZE + 1];
+        fixed (char* aliasPtr = aliasBuffer)
+        {
+            var status = PInvoke.ConvertInterfaceLuidToAlias(&luid, aliasPtr, (uint)aliasBuffer.Length);
+            if (status != 0)
+            {
+                Log.Debug("ConvertInterfaceLuidToAlias failed with {Status} for LUID {InterfaceLuid}", status, interfaceLuid);
+                return null;
+            }
+
+            return new string(aliasPtr);
+        }
     }
 
     public static bool WaitForOperationalStatus(int interfaceIndex, OperationalStatus status, TimeSpan timeout,
