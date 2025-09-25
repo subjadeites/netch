@@ -3,7 +3,10 @@ using System.Management;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Threading;
 using Windows.Win32;
+using Windows.Win32.NetworkManagement.IpHelper;
+using Serilog;
 using Netch.Models;
 
 namespace Netch.Utils;
@@ -51,6 +54,46 @@ public static class NetworkInterfaceUtils
             UseShellExecute = false,
             Verb = "runas"
         })!.WaitForExit();
+    }
+
+    public static void SetInterfaceAdminStatus(int interfaceIndex, bool enable)
+    {
+        MIB_IF_ROW2 row = default;
+        row.InterfaceIndex = (uint)interfaceIndex;
+
+        var result = PInvoke.GetIfEntry2(ref row);
+        if (result != 0)
+        {
+            Log.Warning("GetIfEntry2({InterfaceIndex}) failed with {Result}", interfaceIndex, result);
+            return;
+        }
+
+        var target = enable ? NET_IF_ADMIN_STATUS.NET_IF_ADMIN_STATUS_UP : NET_IF_ADMIN_STATUS.NET_IF_ADMIN_STATUS_DOWN;
+        if (row.AdminStatus == target)
+            return;
+
+        row.AdminStatus = target;
+        result = PInvoke.SetIfEntry2(ref row);
+        if (result != 0)
+            Log.Warning("SetIfEntry2({InterfaceIndex}) failed with {Result}", interfaceIndex, result);
+    }
+
+    public static bool WaitForOperStatus(int interfaceIndex, IF_OPER_STATUS status, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            MIB_IF_ROW2 row = default;
+            row.InterfaceIndex = (uint)interfaceIndex;
+
+            if (PInvoke.GetIfEntry2(ref row) == 0 && row.OperStatus == status)
+                return true;
+
+            Thread.Sleep(TimeSpan.FromMilliseconds(200));
+        }
+
+        return false;
     }
 }
 

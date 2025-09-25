@@ -1,6 +1,8 @@
 ﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using Windows.Win32.NetworkManagement.IpHelper;
+using Serilog;
 using Netch.Interfaces;
 using Netch.Interops;
 using Netch.Models;
@@ -119,12 +121,72 @@ namespace Netch.Controllers
 
         public async Task StopAsync()
         {
-            if (!await FreeAsync().ConfigureAwait(false))
-                throw new MessageException("tun2socks free failed.");
+            var freeTask = FreeAsync();
+            var forcedInterfaceDown = false;
+
+            try
+            {
+                if (!await WaitForCompletionAsync(freeTask, TimeSpan.FromSeconds(5)).ConfigureAwait(false))
+                {
+                    if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 26100) && _tun.InterfaceIndex > 0)
+                    {
+                        forcedInterfaceDown = TryForceTunShutdown();
+                        if (!await WaitForCompletionAsync(freeTask, TimeSpan.FromSeconds(5)).ConfigureAwait(false))
+                            throw new MessageException("tun2socks free timed out.");
+                    }
+                    else
+                    {
+                        throw new MessageException("tun2socks free timed out.");
+                    }
+                }
+
+                if (!await freeTask.ConfigureAwait(false))
+                    throw new MessageException("tun2socks free failed.");
+            }
+            finally
+            {
+                if (forcedInterfaceDown)
+                {
+                    try
+                    {
+                        NetworkInterfaceUtils.SetInterfaceAdminStatus(_tun.InterfaceIndex, true);
+                        NetworkInterfaceUtils.WaitForOperStatus(_tun.InterfaceIndex, IF_OPER_STATUS.IfOperStatusUp,
+                            TimeSpan.FromSeconds(3));
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Warning(e, "Failed to restore TUN interface state");
+                    }
+                }
+            }
 
             await Task.WhenAll(
                 Task.Run(ClearRouteTable),
                 _aioDnsController.StopAsync()).ConfigureAwait(false);
+        }
+
+        private async Task<bool> WaitForCompletionAsync(Task task, TimeSpan timeout)
+        {
+            var completedTask = await Task.WhenAny(task, Task.Delay(timeout)).ConfigureAwait(false);
+            return completedTask == task;
+        }
+
+        private bool TryForceTunShutdown()
+        {
+            try
+            {
+                NetworkInterfaceUtils.SetInterfaceAdminStatus(_tun.InterfaceIndex, false);
+                if (!NetworkInterfaceUtils.WaitForOperStatus(_tun.InterfaceIndex, IF_OPER_STATUS.IfOperStatusDown,
+                        TimeSpan.FromSeconds(3)))
+                    Log.Warning("Timed out waiting for TUN interface to report down state");
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                Log.Warning(e, "Failed to force TUN interface shutdown");
+                return false;
+            }
         }
 
         private void CheckDriver()
