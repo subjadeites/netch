@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using Serilog;
@@ -23,6 +24,9 @@ namespace Netch.Controllers
 
         private NetRoute _tun;
         private NetRoute _outbound;
+
+        private ulong _tunLuid;
+        private string? _tunInterfaceAlias;
 
         public string Name => "tun2socks";
         public string interfaceName => "netch";
@@ -54,7 +58,9 @@ namespace Netch.Controllers
                 await Task.Delay(300);
                 try
                 {
-                    _tun.InterfaceIndex = NetworkInterfaceUtils.Get(ni => ni.Name.StartsWith(interfaceName)).GetIndex();
+                    var interfaceInfo = NetworkInterfaceUtils.Get(ni => ni.Name.StartsWith(interfaceName));
+                    _tunInterfaceAlias = interfaceInfo.Name;
+                    _tun.InterfaceIndex = interfaceInfo.GetIndex();
                     break;
                 }
                 catch
@@ -107,7 +113,10 @@ namespace Netch.Controllers
             if (!Init())
                 throw new MessageException("tun2socks start failed.");
 
-            var tunIndex = (int)RouteHelper.ConvertLuidToIndex(tun_luid());
+            _tunLuid = tun_luid();
+            RefreshTunInterfaceAlias();
+            var tunIndex = (int)RouteHelper.ConvertLuidToIndex(_tunLuid);
+            RefreshTunInterfaceIndex();
             _tun = NetRoute.TemplateBuilder(_tunConfig.Gateway, tunIndex);
 
             RouteHelper.CreateUnicastIP(AddressFamily.InterNetwork,
@@ -129,8 +138,15 @@ namespace Netch.Controllers
                 {
                     if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 26100) && _tun.InterfaceIndex > 0)
                     {
-                        forcedInterfaceDown = NetworkInterfaceUtils.TrySetInterfaceAdminStatus(_tun.InterfaceIndex, false,
-                            TimeSpan.FromSeconds(3));
+                        RefreshTunInterfaceAlias();
+                        RefreshTunInterfaceIndex();
+
+                        forcedInterfaceDown = NetworkInterfaceUtils.TrySetInterfaceAdminStatus(
+                            _tun.InterfaceIndex,
+                            _tunLuid,
+                            false,
+                            TimeSpan.FromSeconds(3),
+                            interfaceAliasHint: _tunInterfaceAlias);
 
                         if (!await WaitForCompletionAsync(freeTask, TimeSpan.FromSeconds(5)).ConfigureAwait(false))
                             throw new MessageException("tun2socks free timed out.");
@@ -150,7 +166,14 @@ namespace Netch.Controllers
                 {
                     try
                     {
-                        NetworkInterfaceUtils.TrySetInterfaceAdminStatus(_tun.InterfaceIndex, true, TimeSpan.FromSeconds(5));
+                        RefreshTunInterfaceAlias();
+                        RefreshTunInterfaceIndex();
+                        NetworkInterfaceUtils.TrySetInterfaceAdminStatus(
+                            _tun.InterfaceIndex,
+                            _tunLuid,
+                            true,
+                            TimeSpan.FromSeconds(5),
+                            interfaceAliasHint: _tunInterfaceAlias);
                     }
                     catch (Exception e)
                     {
@@ -162,6 +185,48 @@ namespace Netch.Controllers
             await Task.WhenAll(
                 Task.Run(ClearRouteTable),
                 _aioDnsController.StopAsync()).ConfigureAwait(false);
+        }
+
+        private void RefreshTunInterfaceIndex()
+        {
+            if (_tunLuid == 0)
+                return;
+
+            try
+            {
+                var interfaceIndex = (int)RouteHelper.ConvertLuidToIndex(_tunLuid);
+
+                if (interfaceIndex > 0 && interfaceIndex != _tun.InterfaceIndex)
+                {
+                    Log.Debug("Updated TUN interface index from {OldIndex} to {NewIndex}", _tun.InterfaceIndex, interfaceIndex);
+                    _tun.InterfaceIndex = interfaceIndex;
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Debug(e, "Failed to refresh TUN interface index");
+            }
+        }
+
+        private void RefreshTunInterfaceAlias()
+        {
+            if (_tunLuid == 0)
+                return;
+
+            try
+            {
+                var alias = NetworkInterfaceUtils.TryGetInterfaceAlias(_tunLuid);
+
+                if (!string.IsNullOrWhiteSpace(alias) && !string.Equals(alias, _tunInterfaceAlias, StringComparison.OrdinalIgnoreCase))
+                {
+                    Log.Debug("Updated TUN interface alias from {OldAlias} to {NewAlias}", _tunInterfaceAlias, alias);
+                    _tunInterfaceAlias = alias;
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Debug(e, "Failed to refresh TUN interface alias");
+            }
         }
 
         private static async Task<bool> WaitForCompletionAsync(Task task, TimeSpan timeout)
