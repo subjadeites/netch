@@ -68,6 +68,15 @@ namespace Netch.Interops
                 IsBackground = true
             };
 
+            try
+            {
+                freeThread.SetApartmentState(ApartmentState.STA);
+            }
+            catch (InvalidOperationException e)
+            {
+                Log.Warning(e, "[tun2socks] failed to set STA apartment before freeing");
+            }
+
             freeThread.Start();
 
             if (cancellationToken.CanBeCanceled)
