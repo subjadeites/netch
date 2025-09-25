@@ -6,6 +6,8 @@ using System.Net.Sockets;
 using System.Threading;
 using Serilog;
 using Windows.Win32;
+using Windows.Win32.NetworkManagement.IpHelper;
+using Serilog;
 using Netch.Models;
 
 namespace Netch.Utils;
@@ -131,6 +133,7 @@ public static class NetworkInterfaceUtils
 
     public static bool WaitForOperationalStatus(int interfaceIndex, OperationalStatus status, TimeSpan timeout,
         bool treatMissingAsMatch = false)
+
     {
         var deadline = DateTime.UtcNow + timeout;
 
@@ -148,6 +151,7 @@ public static class NetworkInterfaceUtils
             {
                 return true;
             }
+
 
             Thread.Sleep(TimeSpan.FromMilliseconds(200));
         }
