@@ -49,10 +49,11 @@ namespace Netch.Interops
             return tun_init();
         }
 
-        public static async Task<bool> FreeAsync()
+        public static Task<bool> FreeAsync(CancellationToken cancellationToken = default)
         {
-            var tcs = new TaskCompletionSource<bool>();
-            new Thread(() =>
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            var freeThread = new Thread(() =>
             {
                 try
                 {
@@ -65,15 +66,27 @@ namespace Netch.Interops
             })
             {
                 IsBackground = true
-            }.Start();
+            };
 
-            var completed = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
-            if (completed != tcs.Task)
+            try
             {
-                Log.Warning("[tun2socks] free timed out");
-                return false;
+                freeThread.SetApartmentState(ApartmentState.STA);
             }
-            return await tcs.Task.ConfigureAwait(false);
+            catch (InvalidOperationException e)
+            {
+                Log.Warning(e, "[tun2socks] failed to set STA apartment before freeing");
+            }
+
+            freeThread.Start();
+
+            if (cancellationToken.CanBeCanceled)
+            {
+                var registration = cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
+                tcs.Task.ContinueWith(_ => registration.Dispose(), CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            }
+
+            return tcs.Task;
         }
 
         private const string tun2socks_bin = "tun2socks.bin";
