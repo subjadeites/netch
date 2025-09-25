@@ -4,12 +4,12 @@ using System.Management;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using Serilog;
-using Windows.Win32;
-using Windows.Win32.NetworkManagement.IpHelper;
-using Serilog;
 using Netch.Models;
+using Windows.Win32;
 
 namespace Netch.Utils;
 
@@ -179,23 +179,36 @@ public static class NetworkInterfaceUtils
         }
     }
 
-    private static unsafe string? GetInterfaceAliasFromLuid(ulong interfaceLuid)
+    private static string? GetInterfaceAliasFromLuid(ulong interfaceLuid)
     {
-        NET_LUID luid = default;
-        *(ulong*)&luid = interfaceLuid;
+        var luid = new NativeMethods.NET_LUID { Value = interfaceLuid };
 
-        Span<char> aliasBuffer = stackalloc char[(int)PInvoke.IF_MAX_STRING_SIZE + 1];
-        fixed (char* aliasPtr = aliasBuffer)
+        var aliasBuilder = new StringBuilder(NativeMethods.IF_MAX_STRING_SIZE + 1);
+        var status = NativeMethods.ConvertInterfaceLuidToAlias(ref luid, aliasBuilder, (uint)aliasBuilder.Capacity);
+        if (status != 0)
         {
-            var status = PInvoke.ConvertInterfaceLuidToAlias(&luid, aliasPtr, (uint)aliasBuffer.Length);
-            if (status != 0)
-            {
-                Log.Debug("ConvertInterfaceLuidToAlias failed with {Status} for LUID {InterfaceLuid}", status, interfaceLuid);
-                return null;
-            }
-
-            return new string(aliasPtr);
+            Log.Debug("ConvertInterfaceLuidToAlias failed with {Status} for LUID {InterfaceLuid}", status, interfaceLuid);
+            return null;
         }
+
+        var alias = aliasBuilder.ToString();
+        var terminatorIndex = alias.IndexOf('\0');
+        return terminatorIndex >= 0 ? alias[..terminatorIndex] : alias;
+    }
+
+    private static class NativeMethods
+    {
+        public const int IF_MAX_STRING_SIZE = 256;
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct NET_LUID
+        {
+            public ulong Value;
+        }
+
+        [DllImport("iphlpapi.dll", CharSet = CharSet.Unicode)]
+        public static extern uint ConvertInterfaceLuidToAlias(ref NET_LUID InterfaceLuid, StringBuilder InterfaceAlias,
+            uint Length);
     }
 
     public static bool WaitForOperationalStatus(int interfaceIndex, OperationalStatus status, TimeSpan timeout,
