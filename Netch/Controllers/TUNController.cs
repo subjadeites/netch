@@ -1,7 +1,6 @@
 ﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using Windows.Win32.NetworkManagement.IpHelper;
 using Serilog;
 using Netch.Interfaces;
 using Netch.Interops;
@@ -130,7 +129,9 @@ namespace Netch.Controllers
                 {
                     if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 26100) && _tun.InterfaceIndex > 0)
                     {
-                        forcedInterfaceDown = TryForceTunShutdown();
+                        forcedInterfaceDown = NetworkInterfaceUtils.TrySetInterfaceAdminStatus(_tun.InterfaceIndex, false,
+                            TimeSpan.FromSeconds(3));
+
                         if (!await WaitForCompletionAsync(freeTask, TimeSpan.FromSeconds(5)).ConfigureAwait(false))
                             throw new MessageException("tun2socks free timed out.");
                     }
@@ -149,13 +150,11 @@ namespace Netch.Controllers
                 {
                     try
                     {
-                        NetworkInterfaceUtils.SetInterfaceAdminStatus(_tun.InterfaceIndex, true);
-                        NetworkInterfaceUtils.WaitForOperStatus(_tun.InterfaceIndex, IF_OPER_STATUS.IfOperStatusUp,
-                            TimeSpan.FromSeconds(3));
+                        NetworkInterfaceUtils.TrySetInterfaceAdminStatus(_tun.InterfaceIndex, true, TimeSpan.FromSeconds(5));
                     }
                     catch (Exception e)
                     {
-                        Log.Warning(e, "Failed to restore TUN interface state");
+                        Log.Warning(e, "Failed to restore TUN interface after forced shutdown");
                     }
                 }
             }
@@ -165,28 +164,10 @@ namespace Netch.Controllers
                 _aioDnsController.StopAsync()).ConfigureAwait(false);
         }
 
-        private async Task<bool> WaitForCompletionAsync(Task task, TimeSpan timeout)
+        private static async Task<bool> WaitForCompletionAsync(Task task, TimeSpan timeout)
         {
-            var completedTask = await Task.WhenAny(task, Task.Delay(timeout)).ConfigureAwait(false);
-            return completedTask == task;
-        }
-
-        private bool TryForceTunShutdown()
-        {
-            try
-            {
-                NetworkInterfaceUtils.SetInterfaceAdminStatus(_tun.InterfaceIndex, false);
-                if (!NetworkInterfaceUtils.WaitForOperStatus(_tun.InterfaceIndex, IF_OPER_STATUS.IfOperStatusDown,
-                        TimeSpan.FromSeconds(3)))
-                    Log.Warning("Timed out waiting for TUN interface to report down state");
-
-                return true;
-            }
-            catch (Exception e)
-            {
-                Log.Warning(e, "Failed to force TUN interface shutdown");
-                return false;
-            }
+            var completed = await Task.WhenAny(task, Task.Delay(timeout)).ConfigureAwait(false);
+            return completed == task;
         }
 
         private void CheckDriver()
