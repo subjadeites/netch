@@ -8,10 +8,14 @@ namespace Netch.Servers;
 
 public class V2rayController : Guard, IServerController
 {
-    public V2rayController() : base("v2ray-sn.exe")
+    protected V2rayController(string executableName) : base(executableName)
     {
         //if (!Global.Settings.V2RayConfig.XrayCone)
         //    Instance.StartInfo.Environment["XRAY_CONE_DISABLED"] = "true";
+    }
+
+    public V2rayController() : this("v2ray-sn.exe")
+    {
     }
 
     protected override IEnumerable<string> StartedKeywords => new[] { "started" };
@@ -34,4 +38,13 @@ public class V2rayController : Guard, IServerController
         await StartGuardAsync("run -c ..\\data\\last.json");
         return new Socks5Server(IPAddress.Loopback.ToString(), this.Socks5LocalPort(), s.Hostname);
     }
+}
+
+public class XrayController : V2rayController
+{
+    public XrayController() : base("xray.exe")
+    {
+    }
+
+    public override string Name => "Xray";
 }
