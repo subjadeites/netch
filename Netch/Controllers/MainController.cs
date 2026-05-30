@@ -61,7 +61,7 @@ public static class MainController
                 // Start Server Controller to get a local socks5 server
                 Log.Debug("Server Information: {Data}", $"{server.Type} {server.MaskedData()}");
 
-                ServerController = new V2rayController();
+                ServerController = CreateServerController(server);
                 Global.MainForm.StatusText(i18N.TranslateFormat("Starting {0}", ServerController.Name));
 
                 if (OperatingSystem.IsWindowsVersionAtLeast(8, 1))
@@ -95,6 +95,11 @@ public static class MainController
                     throw new MessageException($"{i18N.Translate("Unhandled Exception")}\n{e.Message}");
             }
         }
+    }
+
+    private static IServerController CreateServerController(Server server)
+    {
+        return server is VLESSServer { TLSSecureType: "reality" } ? new XrayController() : new V2rayController();
     }
 
     public static async Task StopAsync()

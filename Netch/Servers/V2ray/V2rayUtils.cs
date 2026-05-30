@@ -56,6 +56,15 @@ public static class V2rayUtils
             {
                 server.ServerName = parameter.Get("sni") ?? "";
             }
+
+            if (server is VLESSServer vless)
+            {
+                vless.Flow = parameter.Get("flow") ?? "";
+                vless.Fingerprint = parameter.Get("fp") ?? "";
+                vless.PublicKey = parameter.Get("pbk") ?? "";
+                vless.ShortId = parameter.Get("sid") ?? "";
+                vless.SpiderX = Uri.UnescapeDataString(parameter.Get("spx") ?? "");
+            }
         }
 
         var finder = new Regex(@$"^{scheme}://(?<guid>.+?)@(?<server>.+):(?<port>\d+)");
@@ -130,12 +139,31 @@ public static class V2rayUtils
         {
             parameter.Add("security", server.TLSSecureType);
 
-            if (!server.Host.IsNullOrWhiteSpace())
-                parameter.Add("sni", server.Host!);
+            var sni = server.ServerName.ValueOrDefault() ?? server.Host.ValueOrDefault();
+            if (!sni.IsNullOrWhiteSpace())
+                parameter.Add("sni", Uri.EscapeDataString(sni!));
 
             if (server.TLSSecureType == "xtls")
             {
-                parameter.Add("flow", "xtls-rprx-direct");
+                parameter.Add("flow", server is VLESSServer { Flow: { } flow } && !flow.IsNullOrWhiteSpace() ? flow : "xtls-rprx-direct");
+            }
+
+            if (server is VLESSServer vless && server.TLSSecureType == "reality")
+            {
+                if (!vless.Flow.IsNullOrWhiteSpace())
+                    parameter.Add("flow", vless.Flow!);
+
+                if (!vless.Fingerprint.IsNullOrWhiteSpace())
+                    parameter.Add("fp", vless.Fingerprint!);
+
+                if (!vless.PublicKey.IsNullOrWhiteSpace())
+                    parameter.Add("pbk", vless.PublicKey!);
+
+                if (!vless.ShortId.IsNullOrWhiteSpace())
+                    parameter.Add("sid", vless.ShortId!);
+
+                if (!vless.SpiderX.IsNullOrWhiteSpace())
+                    parameter.Add("spx", Uri.EscapeDataString(vless.SpiderX!));
             }
         }
 
