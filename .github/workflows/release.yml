@@ -12,6 +12,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
       - name: Checksum
         shell: pwsh
         run: |
@@ -45,7 +50,7 @@ jobs:
         id: check_other
         uses: andstor/file-existence-action@v2
         with:
-          files: .\other\release\aiodns.bin
+          files: .\Other\release\aiodns.bin, .\Other\release\xray.exe
 
       - name: Setup Go
         uses: actions/setup-go@v3
