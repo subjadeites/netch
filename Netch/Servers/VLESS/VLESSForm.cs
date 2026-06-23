@@ -33,6 +33,11 @@ internal class VLESSForm : ServerForm
         CreateTextBox("Path", "Path", s => true, s => server.Path = s, server.Path);
         CreateComboBox("QUICSecurity", "QUIC Security", VLESSGlobal.QUIC, s => server.QUICSecure = s, server.QUICSecure);
         CreateTextBox("QUICSecret", "QUIC Secret", s => true, s => server.QUICSecret = s, server.QUICSecret);
+        CreateComboBox("Flow", "Flow", VLESSGlobal.Flows, s => server.Flow = s, server.Flow);
+        CreateComboBox("Fingerprint", "Fingerprint", VLESSGlobal.Fingerprints, s => server.Fingerprint = s, server.Fingerprint);
+        CreateTextBox("PublicKey", "Reality Public Key", s => true, s => server.PublicKey = s, server.PublicKey);
+        CreateTextBox("ShortId", "Reality Short ID", s => true, s => server.ShortId = s, server.ShortId);
+        CreateTextBox("SpiderX", "Reality SpiderX", s => true, s => server.SpiderX = s, server.SpiderX);
         CreateComboBox("UseMux",
             "Use Mux",
             new List<string> { "", "true", "false" },
