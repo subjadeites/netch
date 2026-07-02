@@ -22,7 +22,8 @@ public static class V2rayConfigUtils
                     {
                         auth = "noauth",
                         udp = true
-                    }
+                    },
+                    sniffing = inboundSniffing(server)
                 }
             }
         };
@@ -30,6 +31,20 @@ public static class V2rayConfigUtils
         v2rayConfig.outbounds = new[] { await outbound(server) };
 
         return v2rayConfig;
+    }
+
+    private static object? inboundSniffing(Server server)
+    {
+        if (server is not VLESSServer { TLSSecureType: "reality" })
+            return null;
+
+        return new
+        {
+            enabled = true,
+            destOverride = new[] { "http", "tls", "quic" },
+            metadataOnly = false,
+            routeOnly = false
+        };
     }
 
     private static async Task<Outbound> outbound(Server server)
