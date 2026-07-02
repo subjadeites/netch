@@ -18,6 +18,31 @@ public class VLESSServer : VMessServer
     ///     伪装类型
     /// </summary>
     public override string FakeType { get; set; } = VLESSGlobal.FakeTypes[0];
+
+    /// <summary>
+    ///     VLESS flow，例如 xtls-rprx-vision
+    /// </summary>
+    public string? Flow { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Reality uTLS 指纹
+    /// </summary>
+    public string? Fingerprint { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Reality public key
+    /// </summary>
+    public string? PublicKey { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Reality short id
+    /// </summary>
+    public string? ShortId { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Reality spiderX
+    /// </summary>
+    public string? SpiderX { get; set; } = string.Empty;
 }
 
 public class VLESSGlobal
@@ -26,7 +51,30 @@ public class VLESSGlobal
     {
         "none",
         "tls",
-        "xtls"
+        "xtls",
+        "reality"
+    };
+
+    public static readonly List<string> Flows = new()
+    {
+        "",
+        "xtls-rprx-vision",
+        "xtls-rprx-direct"
+    };
+
+    public static readonly List<string> Fingerprints = new()
+    {
+        "",
+        "chrome",
+        "firefox",
+        "safari",
+        "ios",
+        "android",
+        "edge",
+        "360",
+        "qq",
+        "random",
+        "randomized"
     };
 
     public static List<string> FakeTypes => VMessGlobal.FakeTypes;

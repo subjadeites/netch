@@ -22,7 +22,8 @@ public static class V2rayConfigUtils
                     {
                         auth = "noauth",
                         udp = true
-                    }
+                    },
+                    sniffing = inboundSniffing(server)
                 }
             }
         };
@@ -30,6 +31,20 @@ public static class V2rayConfigUtils
         v2rayConfig.outbounds = new[] { await outbound(server) };
 
         return v2rayConfig;
+    }
+
+    private static object? inboundSniffing(Server server)
+    {
+        if (server is not VLESSServer { TLSSecureType: "reality" })
+            return null;
+
+        return new
+        {
+            enabled = true,
+            destOverride = new[] { "http", "tls", "quic" },
+            metadataOnly = false,
+            routeOnly = false
+        };
     }
 
     private static async Task<Outbound> outbound(Server server)
@@ -84,7 +99,7 @@ public static class V2rayConfigUtils
                             new User
                             {
                                 id = getUUID(vless.UserID),
-                                flow = vless.TLSSecureType == "xtls" ? "xtls-rprx-direct" : "",
+                                flow = getVlessFlow(vless),
                                 encryption = vless.EncryptMethod
                             }
                         }
@@ -96,7 +111,7 @@ public static class V2rayConfigUtils
 
                 outbound.streamSettings = boundStreamSettings(vless);
 
-                if (vless.TLSSecureType == "xtls")
+                if (vless.TLSSecureType is "xtls" or "reality")
                 {
                     outbound.mux.enabled = false;
                     outbound.mux.concurrency = -1;
@@ -320,6 +335,19 @@ public static class V2rayConfigUtils
                 case "xtls":
                     streamSettings.xtlsSettings = tlsSettings;
                     break;
+                case "reality":
+                    if (server is not VLESSServer vless)
+                        throw new MessageException("Reality is only supported by VLESS");
+
+                    streamSettings.realitySettings = new RealitySettings
+                    {
+                        fingerprint = vless.Fingerprint.ValueOrDefault(),
+                        serverName = vless.ServerName.ValueOrDefault() ?? vless.Host.SplitOrDefault()?[0],
+                        publicKey = vless.PublicKey.ValueOrDefault(),
+                        shortId = vless.ShortId.ValueOrDefault(),
+                        spiderX = vless.SpiderX.ValueOrDefault()
+                    };
+                    break;
             }
         }
 
@@ -433,5 +461,13 @@ public static class V2rayConfigUtils
             return uuid;
         }
         return uuid.GenerateUUIDv5();
+    }
+
+    private static string getVlessFlow(VLESSServer server)
+    {
+        if (!server.Flow.IsNullOrWhiteSpace())
+            return server.Flow!;
+
+        return server.TLSSecureType == "xtls" ? "xtls-rprx-direct" : "";
     }
 }
