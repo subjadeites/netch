@@ -43,7 +43,7 @@ public static class V2rayConfigUtils
             enabled = true,
             destOverride = new[] { "tls", "quic" },
             metadataOnly = false,
-            routeOnly = true
+            routeOnly = false
         };
     }
 
