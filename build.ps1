@@ -24,6 +24,35 @@ param (
 
 Push-Location (Split-Path $MyInvocation.MyCommand.Path -Parent)
 
+function Invoke-MSBuild {
+	param (
+		[Parameter(Mandatory = $True)]
+		[string]
+		$Project
+	)
+
+	$MSBuild = Get-Command msbuild -ErrorAction SilentlyContinue
+	if ( -Not $MSBuild ) {
+		$VSWhere = "${Env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+		if ( Test-Path $VSWhere ) {
+			$MSBuildPath = & $VSWhere -latest -products * -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+			if ( $MSBuildPath ) {
+				$MSBuild = Get-Command $MSBuildPath -ErrorAction SilentlyContinue
+			}
+		}
+	}
+
+	if ( -Not $MSBuild ) {
+		Write-Error 'MSBuild was not found. Install Visual Studio Build Tools or run microsoft/setup-msbuild before build.ps1.'
+		exit 1
+	}
+
+	& $MSBuild.Path `
+		-property:Configuration=$Configuration `
+		-property:Platform=x64 `
+		$Project
+}
+
 if ( Test-Path -Path $OutputPath ) {
     rm -Recurse -Force $OutputPath
 }
@@ -76,10 +105,7 @@ if ( -Not ( Test-Path ".\Redirector\bin\$Configuration" ) ) {
 	Write-Host
 	Write-Host 'Building Redirector'
 
-	msbuild `
-		-property:Configuration=$Configuration `
-		-property:Platform=x64 `
-		'.\Redirector\Redirector.vcxproj'
+	Invoke-MSBuild '.\Redirector\Redirector.vcxproj'
 	if ( -Not $? ) { exit $lastExitCode }
 }
 cp -Force ".\Redirector\bin\$Configuration\nfapi.dll"      "$OutputPath\bin"
@@ -89,10 +115,7 @@ if ( -Not ( Test-Path ".\RouteHelper\bin\$Configuration" ) ) {
 	Write-Host
 	Write-Host 'Building RouteHelper'
 
-	msbuild `
-		-property:Configuration=$Configuration `
-		-property:Platform=x64 `
-		'.\RouteHelper\RouteHelper.vcxproj'
+	Invoke-MSBuild '.\RouteHelper\RouteHelper.vcxproj'
 	if ( -Not $? ) { exit $lastExitCode }
 }
 cp -Force ".\RouteHelper\bin\$Configuration\RouteHelper.bin" "$OutputPath\bin"

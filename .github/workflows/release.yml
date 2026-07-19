@@ -73,6 +73,11 @@ jobs:
           toolchain: nightly
           profile: minimal
 
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-prerelease: true
+
       - name: Build
         shell: pwsh
         run: |
