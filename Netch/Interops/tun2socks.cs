@@ -40,7 +40,14 @@ namespace Netch.Interops
         public static bool Dial(NameList name, string value)
         {
             Log.Verbose( $"[tun2socks] Dial {name}: {value}");
-            return tun_dial(name, Encoding.UTF8.GetBytes(value));
+            return tun_dial(name, NullTerminatedUtf8(value));
+        }
+
+        private static byte[] NullTerminatedUtf8(string value)
+        {
+            var bytes = Encoding.UTF8.GetBytes(value);
+            Array.Resize(ref bytes, bytes.Length + 1);
+            return bytes;
         }
 
         public static bool Init()

@@ -110,7 +110,7 @@ public static class ModeHelper
                     if (includeMode is TunMode tMode)
                     {
                         tunMode.Bypass.AddRange(tMode.Bypass);
-                        tMode.Handle.AddRange(tMode.Handle);
+                        tunMode.Handle.AddRange(tMode.Handle);
                         break;
                     }
 

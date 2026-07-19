@@ -118,6 +118,8 @@ func aiodns_init() bool {
 	udpSocket, err = net.ListenPacket("udp", Listen)
 	if err != nil {
 		fmt.Printf("[aiodns][init] net.ListenPacket: %v\n", err)
+		tcpSocket.Close()
+		tcpSocket = nil
 		return false
 	}
 
@@ -164,6 +166,8 @@ func handleChinaDNS(w dns.ResponseWriter, m *dns.Msg) {
 	r, _, err := CDNS.Exchange(m, ChinaDNS)
 	if err != nil {
 		fmt.Printf("[aiodns] handleChinaDNS: %v\n", err)
+		r = new(dns.Msg)
+		r.SetRcode(m, dns.RcodeServerFailure)
 	}
 
 	_ = w.WriteMsg(r)
@@ -173,6 +177,8 @@ func handleOtherDNS(w dns.ResponseWriter, m *dns.Msg) {
 	r, _, err := ODNS.Exchange(m, OtherDNS)
 	if err != nil {
 		fmt.Printf("[aiodns] handleOtherDNS: %v\n", err)
+		r = new(dns.Msg)
+		r.SetRcode(m, dns.RcodeServerFailure)
 	}
 
 	_ = w.WriteMsg(r)
