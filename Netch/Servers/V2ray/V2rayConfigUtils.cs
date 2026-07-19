@@ -41,9 +41,9 @@ public static class V2rayConfigUtils
         return new
         {
             enabled = true,
-            destOverride = new[] { "http", "tls", "quic" },
+            destOverride = new[] { "tls", "quic" },
             metadataOnly = false,
-            routeOnly = false
+            routeOnly = true
         };
     }
 
