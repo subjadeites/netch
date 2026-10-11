@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="2.12.0" />
+    <Using Include="Serilog" />
+    <Compile Include="../../../Netch/Interops/AioDNS.cs" Link="AioDNS.cs" />
+    <Compile Include="../../../Netch/Interops/tun2socks.cs" Link="tun2socks.cs" />
+    <Compile Include="../../../Netch/Controllers/DNSController.cs" Link="DNSController.cs" />
+    <Compile Include="../../../Netch/Interfaces/IController.cs" Link="IController.cs" />
+    <Compile Include="../../../Netch/Models/MessageException.cs" Link="MessageException.cs" />
+    <Compile Include="../../../Netch/Models/Settings/AioDNSConfig.cs" Link="AioDNSConfig.cs" />
+    <Compile Include="../../../Netch/Constants.cs" Link="Constants.cs" />
+  </ItemGroup>
+</Project>
