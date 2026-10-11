@@ -30,13 +30,19 @@ jobs:
         with:
           dotnet-version: '6.0.x'
       - uses: msys2/setup-msys2@v2
+        id: msys2
         if: runner.os == 'Windows'
         with:
           install: mingw-w64-x86_64-gcc
       - name: Add MinGW to PATH
         if: runner.os == 'Windows'
         shell: pwsh
-        run: '"C:\msys64\mingw64\bin" | Out-File -FilePath $Env:GITHUB_PATH -Encoding utf8 -Append'
+        env:
+          MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
+        run: |
+          $mingw = Join-Path $Env:MSYS2_ROOT 'mingw64\bin'
+          $mingw | Out-File -FilePath $Env:GITHUB_PATH -Encoding utf8 -Append
+          "CC=$(Join-Path $mingw 'gcc.exe')" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
       - name: Test native lifecycle and error paths
         working-directory: Other/aiodns
         run: go test -race -count=1 -timeout=60s ./...
@@ -45,4 +51,7 @@ jobs:
         run: go build -buildmode=c-shared -o aiodns.bin .
       - name: Test actual C# P/Invoke and controller
         shell: pwsh
-        run: dotnet run --project Other/aiodns/interop-tests --configuration Release -- (Join-Path $PWD 'Other/aiodns/aiodns.bin')
+        run: |
+          $nativeArgs = @((Join-Path $PWD 'Other/aiodns/aiodns.bin'))
+          if ($IsWindows) { $nativeArgs += (Join-Path $PWD 'Storage/tun2socks.bin') }
+          dotnet run --project Other/aiodns/interop-tests --configuration Release -- @nativeArgs

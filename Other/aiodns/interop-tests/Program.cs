@@ -8,10 +8,23 @@ using Netch.Controllers;
 using Netch.Interops;
 using Netch.Models;
 
-if (args.Length != 1)
+if (args.Length is < 1 or > 2)
     throw new ArgumentException("Pass the absolute path to the freshly built AioDNS shared library.");
-var library = NativeLibrary.Load(Path.GetFullPath(args[0]));
-NativeLibrary.SetDllImportResolver(typeof(AioDNS).Assembly, (name, _, _) => name == "aiodns.bin" ? library : IntPtr.Zero);
+var libraryPath = Path.GetFullPath(args[0]);
+var tunPath = args.Length == 2 ? Path.GetFullPath(args[1]) : null;
+NativeLibrary.SetDllImportResolver(typeof(AioDNS).Assembly, (name, _, _) => name switch
+{
+    "aiodns.bin" => NativeLibrary.Load(libraryPath),
+    "tun2socks.bin" when tunPath != null => NativeLibrary.Load(tunPath),
+    _ => IntPtr.Zero
+});
+if (OperatingSystem.IsWindows() && tunPath != null)
+{
+    // Netch loads another Go DLL before AioDNS. Exercise that ordering without
+    // installing an adapter or changing the runner's routes.
+    _ = tun2socks.Dial(tun2socks.NameList.TYPE_ADAPMTU, "1500");
+    Console.WriteLine("Loaded the bundled tun2socks runtime before AioDNS");
+}
 
 var originalDirectory = Directory.GetCurrentDirectory();
 var tempDirectory = Path.Combine(Path.GetTempPath(), "aiodns-测试-" + Guid.NewGuid());
