@@ -45,7 +45,14 @@ jobs:
           "CC=$(Join-Path $mingw 'gcc.exe')" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
       - name: Test native lifecycle and error paths
         working-directory: Other/aiodns
-        run: go test -race -count=1 -timeout=60s ./...
+        shell: pwsh
+        run: |
+          # Go 1.18's Windows race runtime cannot reserve its shadow memory on
+          # current runners. Run the same tests on Windows and use Linux for
+          # race detection; production DLLs are built without -race.
+          $testArgs = @('-count=1', '-timeout=60s')
+          if (-not $IsWindows) { $testArgs += '-race' }
+          go test @testArgs ./...
       - name: Build shared library
         working-directory: Other/aiodns
         run: go build -buildmode=c-shared -o aiodns.bin .
