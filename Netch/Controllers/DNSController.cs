@@ -12,15 +12,22 @@ public class DNSController : IController
     {
         var aioDnsConfig = Global.Settings.AioDNS;
 
-        Dial(NameList.TYPE_REST, "");
-        Dial(NameList.TYPE_LIST, Path.GetFullPath(Constants.AioDnsRuleFile));
+        Configure(NameList.TYPE_REST, "");
+        Configure(NameList.TYPE_LIST, Path.GetFullPath(Constants.AioDnsRuleFile));
         // TODO remove ListenPort setting
-        Dial(NameList.TYPE_LISN, $"127.0.0.1:{aioDnsConfig.ListenPort}");
-        Dial(NameList.TYPE_CDNS, $"{aioDnsConfig.ChinaDNS}");
-        Dial(NameList.TYPE_ODNS, $"{aioDnsConfig.OtherDNS}");
+        Configure(NameList.TYPE_LISN, $"127.0.0.1:{aioDnsConfig.ListenPort}");
+        Configure(NameList.TYPE_CDNS, aioDnsConfig.ChinaDNS);
+        Configure(NameList.TYPE_ODNS, aioDnsConfig.OtherDNS);
 
+        Log.Information("[aiodns] Initializing DNS service");
         if (!await InitAsync())
             throw new MessageException("AioDNS start failed.");
+    }
+
+    private static void Configure(NameList name, string value)
+    {
+        if (!Dial(name, value))
+            throw new MessageException($"AioDNS rejected configuration {name}: {value}");
     }
 
     public Task StopAsync()

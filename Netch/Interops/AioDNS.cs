@@ -27,7 +27,7 @@ public static class AioDNS
 
     public static async Task FreeAsync()
     {
-        var tcs = new TaskCompletionSource<bool>();
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         new Thread(() =>
         {
             try
@@ -48,16 +48,18 @@ public static class AioDNS
         if (completed != tcs.Task)
         {
             Log.Warning("[aiodns] free timed out");
-            return;
+            throw new TimeoutException("AioDNS shutdown timed out.");
         }
 
         await tcs.Task.ConfigureAwait(false);
     }
 
     [DllImport(aiodns_bin, CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.I1)]
     private static extern bool aiodns_dial(NameList name, byte[] value);
 
     [DllImport(aiodns_bin, EntryPoint = "aiodns_init", CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.I1)]
     public static extern bool Init();
 
     [DllImport(aiodns_bin, EntryPoint = "aiodns_free", CallingConvention = CallingConvention.Cdecl)]
